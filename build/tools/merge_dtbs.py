@@ -145,13 +145,25 @@ class DeviceTreeInfo(object):
 		# Hash should only consider msm-id/board-id/pmic-id/extra ids
 		return hash((self.plat_id, self.board_id, self.pmic_id) + tuple(self.extra_ids.values()))
 
+	@staticmethod
+	def _is_wildcard(prop):
+		if not prop:
+			return False
+		return any(all(c == 0 for c in (item if isinstance(item, (tuple, list, set)) else (item,))) for item in prop)
+
 	def __and__(self, other):
 		s = copy.deepcopy(self)
 		for prop in ['plat_id', 'board_id', 'pmic_id']:
-			if getattr(self, prop) is None or getattr(other, prop) is None:
+			self_val = getattr(self, prop)
+			other_val = getattr(other, prop)
+			if self_val is None or other_val is None:
 				setattr(s, prop, None)
+			elif DeviceTreeInfo._is_wildcard(self_val) and not DeviceTreeInfo._is_wildcard(other_val):
+				setattr(s, prop, other_val)
+			elif DeviceTreeInfo._is_wildcard(other_val) and not DeviceTreeInfo._is_wildcard(self_val):
+				setattr(s, prop, self_val)
 			else:
-				setattr(s, prop, getattr(self, prop) & getattr(other, prop))
+				setattr(s, prop, self_val & other_val)
 		for extra_id in self.extra_ids:
 			if self.extra_ids.get(extra_id) is None or other.extra_ids.get(extra_id) is None:
 				s.extra_ids[extra_id] = None
